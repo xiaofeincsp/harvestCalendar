@@ -217,7 +217,7 @@ camilo_wide = camilo_long %>%
 
 camilo_wide$harvestDays = camilo_wide$plantDates + 275-365
 
-full_camilo_wide = data.frame(days = 1:365) %>%
+full_camilo_wide = data.frame(days = 0:364) %>%
   left_join(camilo_wide, by = c("days" = "harvestDays"))
 
 full_camilo_wide$dates = as.Date(full_camilo_wide$days, origin = "2023-01-01")
