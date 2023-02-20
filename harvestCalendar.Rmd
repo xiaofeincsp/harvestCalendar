@@ -1,14 +1,28 @@
+---
+title: "harvestCalendar"
+author: "Xiaofei Zhang"
+date:  "`r format(Sys.time(), '%B %Y')`"
+output: html_document
+---
+
+### __1. think about a new way to manage harvest calendar__
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
 rm(list = ls())
-# install.packages("calendR")
-#devtools::install_github("R-CoderDotCom/calendR")
-# install.packages("lubridate")
-
-
 library(calendR)
 library(tidyverse)
 library(readxl)
 library(openxlsx)
 library(lubridate)
+library(rmarkdown)
+```
+
+__the first step is to generate the rough calendar based on the month after planting__
+
+__trials downloaded from CassavaBase__
+
+```{r}
 # 1. download trial meta information from CassavaBase using wizard
 #    there might be R programming way to download, ask Luis Fernando
 
@@ -24,7 +38,7 @@ meta = read.csv(paste(folder, file, sep=""),
   select(studyName, locationName, plantingDate)
 # convert the data into date format
 meta$plantingDate = ymd(meta$plantingDate)
-# trials without planting date
+print("trials without planting date")
 meta %>%
   filter(is.na(plantingDate))%>%
   select(studyName)
@@ -52,8 +66,12 @@ camilo$plantingDay = yday(camilo$plantingDate)
 # select col
 camilo_sel = camilo %>%
   select(studyName, plantingDay)
+```
 
+__Camilo's planning___
+__trials from Camilo's file; compare and find the extra trials__
 
+```{r}
 # camilo planning harvest calendar
 camilo_plan = read_excel(paste(folder,
                                "Harvest Calendar Humid Car.V4 23_Camilo.xlsx",
@@ -61,7 +79,9 @@ camilo_plan = read_excel(paste(folder,
   select(`Trail name`, Time_harvest, Planting_Time)
 names(camilo_plan) = c("studyName", "harvestDays", "plantingDate")
 
+print("trials only in Camilo's file")
 setdiff(camilo_plan$studyName, camilo_sel$studyName)
+print("trials only in cassavaBase")
 setdiff(camilo_sel$studyName, camilo_plan$studyName)
 
 camilo_sel = camilo_plan %>%
@@ -69,10 +89,11 @@ camilo_sel = camilo_plan %>%
                           "202257DVGST_momi",
                           "2022105DVPRC_cere" ) )
 camilo_sel$plantingDay = yday(camilo_sel$plantingDate)
+```
 
+__assign the harvesting in single days__
 
-
-
+```{r}
 # fill the harvest day 1, 2, 3, 4, 5, 6... 10 ---- maxmum 10 days
 max_harv_days = max(camilo_sel$harvestDays)
 camilo_sel[, c(paste("harvestDay", 1:max_harv_days, sep="") ) ] = NA
@@ -190,10 +211,14 @@ same_harvest = camilo_long %>%
   dplyr::group_by(plantDates, harvestDayNum) %>%
   dplyr::summarise(n = dplyr::n(), .groups = "drop") %>%
   dplyr::filter(n > 1L) 
+print("trials or harvests with duplications")
 same_harvest
 nrow(same_harvest) # if not 0, there are duplicates date+plantday
+```
 
 
+__generate the first version of calendar to start__
+```{r}
 # add the harvesting day before the trial name
 unique_trial = camilo_long %>%
   distinct(studyName, .keep_all = TRUE)
@@ -217,17 +242,19 @@ camilo_wide = camilo_long %>%
 
 camilo_wide$harvestDays = camilo_wide$plantDates + 275-365
 
-full_camilo_wide = data.frame(days = 1:365) %>%
+full_camilo_wide = data.frame(days = 0:364) %>%
   left_join(camilo_wide, by = c("days" = "harvestDays"))
 
 full_camilo_wide$dates = as.Date(full_camilo_wide$days, origin = "2023-01-01")
 full_camilo_wide$weekday <- weekdays(full_camilo_wide$dates)  
 full_camilo_wide$plant_date <- as.Date(full_camilo_wide$plantDates, origin = "2022-01-01")   
 
+
 #str(full_camilo_wide)
 #names(full_camilo_wide)
 #View(full_camilo_wide)
 
+paged_table(full_camilo_wide)
 
 write.xlsx(full_camilo_wide, 
            paste(folder, 
@@ -236,7 +263,11 @@ write.xlsx(full_camilo_wide,
                  Sys.Date(), 
                  ".xlsx", 
                  sep="") )
+```
 
+
+__print out the first version of harvest calendar__
+```{r, fig.width = 16, fig.height=10 }
 
 
 camilo_comb <- full_camilo_wide %>%
@@ -260,9 +291,14 @@ calendR(year = 2023,
         special.col = 1:length(unique(na.omit(myfills))),     # Add as many colors as events
         legend.pos = "right")  # Add a legend if desired
 
+```
+
+### __2. modify the harvest calendar based on Camilo's plan__
+
+__manually move the harvesting time of trials in excel__
 
 
-
+```{r, fig.width = 16, fig.height=10 }
 
 ##########################################
 #### after modify the harvesing data #####
@@ -326,7 +362,11 @@ calendR(year = 2023,
         special.col = 1:length(unique(na.omit(myfills))),     # Add as many colors as events
         legend.pos = "right")  # Add a legend if desired
 
+```
 
+__Here is the planting calendar__
+
+```{r, fig.width = 16, fig.height=10 }
 #############################################
 ### check the planting calendar
 
@@ -378,4 +418,7 @@ calendR(year = 2023,
         special.days = myfills,
         special.col = 1:length(unique(na.omit(myfills))),     # Add as many colors as events
         legend.pos = "right")  # Add a legend if desired
+
+
+```
 
